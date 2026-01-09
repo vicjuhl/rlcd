@@ -1,2 +1,3 @@
 run_benchpress.sh
 __pycache__/
+settings.json

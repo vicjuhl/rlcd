@@ -1,6 +1,9 @@
 import argparse
 from typing import Optional, Sequence, Dict, Any
 
+from search import search
+from gen_data import gen_data
+
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     parser = argparse.ArgumentParser(prog="rlcd")
@@ -17,8 +20,10 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     command-line. This keeps `main` signature simple and focused on CLI usage.
     """
     args = parse_args(argv)
-    print(args["verbose"])
-
+    if args["verbose"]:
+        print("verbose")
+    df = gen_data()
+    search(df)
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,8 @@
 import torch
 from typing import Tuple, Literal
 
+from config import conf
+
 def makes_cycles(s: torch.Tensor, new_edge: Tuple[int, int]) -> bool:
     """Asses whether the addition of new_edge creates cycle(s)."""
     new_parent, new_child = new_edge
@@ -44,3 +46,28 @@ def alter_edge(
         return s_new, True
     else: # cycles
         return s_old, False
+    
+def sample_action(q_table: torch.Tensor) -> Tuple[Tuple[int, int], Literal[0, 1, 2]]:
+    tau = conf["tau"]
+    q_flat = q_table.flatten()
+    pi_flat = torch.softmax(q_flat / tau, dim=0)
+    idx = torch.multinomial(pi_flat, num_samples=1).item()
+    i, j, a = torch.unravel_index(idx, q_table.shape)
+    return (i.item(), j.item()), a.item()
+
+def perform_legal_action(s: torch.Tensor) -> Tuple[Tuple[int, int],  Literal[0, 1, 2]]:
+    """Sample action based on state.
+    
+    Returns
+    (x_1, x_2), a
+    where x_1, x_2 are adj mat coordinates and a the action; 0: remove, 1: add, 2 flip
+    """
+    # q_table = q_target(s)
+    d = s.shape[0]
+    q_table = torch.rand((d, d, 3))
+    success = False
+    while not success:
+        action = sample_action(q_table)
+        s_new, success = alter_edge(s, action)
+
+    return s_new, action

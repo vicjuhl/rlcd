@@ -3,8 +3,10 @@ channels:
   - conda-forge
   - defaults
 dependencies:
+  - networkx=3.6.1
   - pandas=2.3.3
   - pip=25.3
-  - python=3.14.2
+  - python=3.13.11
+  - pytorch=2.9.1
   - pip:
-      - torch==2.9.1
+      

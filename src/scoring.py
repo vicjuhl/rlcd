@@ -49,7 +49,7 @@ def est_mle_W(
             break
         prev_W = W.clone().detach()
 
-    return (W * s).detach()
+    return (W * s).detach() # masking with DAG s as a safety measure
 
 def est_mles(s: torch.Tensor, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
     n, d = X.shape
@@ -70,18 +70,14 @@ def est_mles(s: torch.Tensor, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tens
 
     return b, W
 
-def logllhood(X: torch.Tensor, W: torch.Tensor, b: torch.Tensor) -> float:
+def logllhood(X: torch.Tensor, b: torch.Tensor) -> float:
     n, d = X.shape
-    X_pred = X @ W
-    resids = X - X_pred
-    return (
-        -n * torch.log(2 * b) - 1 / b * resids.abs().sum(dim=0)
-    ).sum().item()
+    return - n * (d + torch.log(2 * b).sum()).item()
 
 def score(s: torch.Tensor, X: torch.Tensor, l_0: float) -> float:
     beta = conf["beta"]
     degree = s.sum()
     b, W = est_mles(s, X)
-    l_s = logllhood(X, W, b)
+    l_s = logllhood(X, b)
 
     return l_s - l_0 - beta * degree

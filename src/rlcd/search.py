@@ -1,11 +1,10 @@
-import numpy as np
 import pandas as pd
 import torch
 from typing import Tuple, Literal
 
-from config import conf
-from scoring import score
-from actions import perform_legal_action
+from rlcd.config import conf
+from rlcd.scoring import score
+from rlcd.actions import perform_legal_action
 
 def run_episode(X: torch.Tensor, horizon: int) -> dict[str, torch.Tensor | int]:
     print(f"\nRunning episode with T={horizon}")

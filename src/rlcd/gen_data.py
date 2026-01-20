@@ -2,8 +2,8 @@ import torch
 import pandas as pd
 import networkx as nx
 
-from config import conf
-from actions import alter_edge
+from rlcd.config import conf
+from rlcd.actions import alter_edge
 
 def gen_dag() -> torch.Tensor:
     """Generate topologically ordered DAG."""

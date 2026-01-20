@@ -1,7 +1,7 @@
 import torch
 from typing import Tuple
 
-from config import conf
+from rlcd.config import conf
 
 def est_mle_b(X: torch.Tensor, W: torch.Tensor) -> torch.Tensor:
     XW = X @ W

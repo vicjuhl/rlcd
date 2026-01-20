@@ -1,9 +1,10 @@
 import argparse
 from typing import Optional, Sequence, Dict, Any
 
-from search import search
-from gen_data import gen_data
+from rlcd.search import search
+from rlcd.gen_data import gen_data
 
+from rlcd.model import QNetwork
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     parser = argparse.ArgumentParser(prog="rlcd")
@@ -23,6 +24,10 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     if args["verbose"]:
         print("verbose")
     df = gen_data()
+
+
+
+    # policy_net = QNetwork(...) #arg here TODO
     search(df)
 
 if __name__ == "__main__":

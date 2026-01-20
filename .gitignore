@@ -1,3 +1,5 @@
 run_benchpress.sh
 __pycache__/
 settings.json
+build/
+src/r.egg-info/

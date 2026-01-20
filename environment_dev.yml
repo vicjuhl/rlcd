@@ -1,0 +1,12 @@
+name: rlcd
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - networkx=3.6.1
+  - pandas=2.3.3
+  - pip=25.3
+  - python=3.13.11
+  - pytorch=2.9.1
+  - pip:
+      - pytest==9.0.2

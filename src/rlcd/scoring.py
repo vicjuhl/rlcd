@@ -25,7 +25,7 @@ def est_mle_W(
     max_steps: maximum iterations
     verbose: print convergence info
     """
-    d = X.shape[1]
+    _, d = X.shape
     W = torch.zeros((d, d), requires_grad=True)
     optimizer = torch.optim.Adam([W], lr=lr)
 
@@ -52,21 +52,8 @@ def est_mle_W(
     return (W * s).detach() # masking with DAG s as a safety measure
 
 def est_mles(s: torch.Tensor, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-    n, d = X.shape
-    tol = 1e-6
-
-    b_old = torch.ones(d)
-    W_old = torch.zeros_like(s)
-    while True:
-        b = est_mle_b(X, W_old)
-        W = est_mle_W(X, s)
-        if (
-            (b - b_old).abs().max().item() < tol and
-            (W - W_old).abs().max().item() < tol
-        ):
-            break
-        b_old = b.clone()
-        W_old = W.clone()
+    W = est_mle_W(X, s)
+    b = est_mle_b(X, W)
 
     return b, W
 

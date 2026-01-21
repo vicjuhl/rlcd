@@ -11,7 +11,7 @@ def est_mle_W(
     X: torch.Tensor,
     s: torch.Tensor,
     lr=0.05,
-    tol=1e-6,
+    tol=1e-3,
     max_steps=5000,
     verbose=True
 ) -> torch.Tensor:
@@ -44,11 +44,15 @@ def est_mle_W(
         # check convergence
         max_change = (W - prev_W).abs().max().item()
         if max_change < tol:
-            if verbose:
-                print(f"Converged at step {step}, max change {max_change:.2e}")
             break
         prev_W = W.clone().detach()
 
+    if verbose:
+        print(f"Max change {max_change:.2e}")
+        if max_change > tol:
+            print("Warning: weights optimization did not converge\n")
+        else:
+            print(f"Converged in {step} steps.")
     return (W * s).detach() # masking with DAG s as a safety measure
 
 def est_mles(s: torch.Tensor, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:

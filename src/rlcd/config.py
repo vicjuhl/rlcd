@@ -1,12 +1,12 @@
 import math
 
-n = 100
+n = 1000
 
 conf = {
-    "epoch_T_schedule": [10, 100],
+    "epoch_T_schedule": [10, 20],
     "N": 10,
     "n": n,
     "indegree": 16,
-    "beta": 1/2 * math.log(n),
+    "beta": math.log(n) * 50,
     "tau": 1
 }

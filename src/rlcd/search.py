@@ -8,11 +8,14 @@ from rlcd.scoring import score
 from rlcd.actions import perform_legal_action
 from rlcd.model import QNetwork
 
-def run_episode(X: torch.Tensor, horizon: int) -> dict[str, torch.Tensor | int]:
+def run_episode(
+    X: torch.Tensor,
+    horizon: int,
+    q_online: QNetwork,
+    q_target: QNetwork
+) -> dict[str, torch.Tensor | int]:
     print(f"\nRunning episode with T={horizon}")
     _, d = X.shape
-    q_online = QNetwork(d)
-    q_target = deepcopy(q_online)
 
     s = torch.zeros((d, d))
     l0 = score(s, X, 0)
@@ -30,9 +33,14 @@ def run_episode(X: torch.Tensor, horizon: int) -> dict[str, torch.Tensor | int]:
 def search(df: pd.DataFrame) -> torch.Tensor:
     d = len(df.columns)
     X = torch.tensor(df.values)
+    # Neural network
+    q_online = QNetwork(d)
+    q_target = deepcopy(q_online)
+    # Maintain best seen graph
     best = {"state": torch.zeros((d, d)), "score": 0}
+    # Run episodes according to schedule
     for T in conf["epoch_T_schedule"]:
-        epsd_best = run_episode(X, T)
+        epsd_best = run_episode(X, T, q_online, q_target)
         if epsd_best["score"] > best["score"]:
             best = epsd_best.copy()
     print("\nBest state:")

@@ -98,6 +98,21 @@ def sample_action(q_table: torch.Tensor) -> Tuple[Tuple[int, int], Literal[0, 1,
     i, j, a = torch.unravel_index(idx, q_table.shape)
     return (i.item(), j.item()), a.item()
 
+def expectation_of_q(q_table: torch.Tensor, legal_mask: torch.Tensor) -> torch.Tensor:
+    """Finds expectation of Q tables, one for each batch element."""
+    tau = conf["tau"]
+    bs = q_table.shape[0]
+
+    # Flatten per batch
+    q_flat = q_table.clone().view(bs, -1) # (bs, d*d)
+    mask_flat = legal_mask.view(bs, -1) # (bs, d*d)
+
+    # Remove masked values
+    q_flat[~mask_flat] = float('-inf') # (bs, d*d)
+
+    pi = torch.softmax(q_flat / tau, dim=1)
+    return (pi * q_flat).sum(dim=1) # (bs,)
+
 def perform_legal_action(
     s: torch.Tensor,
     q_target: QNetwork

@@ -2,6 +2,7 @@ import torch
 from typing import Tuple, Literal
 
 from rlcd.config import conf
+from rlcd.model import QNetwork
 
 def makes_cycles(s: torch.Tensor, new_edge: Tuple[int, int]) -> bool:
     """Asses whether the addition of new_edge creates cycle(s)."""
@@ -93,27 +94,40 @@ def sample_action(q_table: torch.Tensor) -> Tuple[Tuple[int, int], Literal[0, 1,
     tau = conf["tau"]
     q_flat = q_table.flatten()
     pi_flat = torch.softmax(q_flat / tau, dim=0)
-    idx = torch.multinomial(pi_flat, num_samples=1).item()
+    idx = torch.multinomial(pi_flat, num_samples=1)
     i, j, a = torch.unravel_index(idx, q_table.shape)
     return (i.item(), j.item()), a.item()
 
-def perform_legal_action(s: torch.Tensor) -> Tuple[Tuple[int, int],  Literal[0, 1, 2]]:
+def perform_legal_action(
+    s: torch.Tensor,
+    q_target: QNetwork
+) -> Tuple[torch.Tensor, Tuple[Tuple[int, int],  Literal[0, 1, 2]]]:
     """Sample action based on state.
     
     Returns
     (x_1, x_2), a
     where x_1, x_2 are adj mat coordinates and a the action; 0: remove, 1: add, 2 flip
     """
-    # q_table = q_target(s)
     d = s.shape[0]
-    # Filter the low-hanging fruits: loops of len 1 and 2
-    len_1_loops_filter = ~torch.ones((d, d), dtype=torch.bool)
-    len_2_loops_filter = ~s.T
-    q_table = torch.rand((d, d, 3)) * len_1_loops_filter * len_2_loops_filter
+    s_bool = s.bool()
+    q_table = q_target.forward(s) #(d, d, 3)
+
+    # Filter removals and reversals (all existing edges)
+    # Some reversals may create cycles, checked below
+    q_table[:, :, 0] *= s_bool
+    q_table[:, :, 2] *= s_bool
+
+    # Filter additions. Only low-hanging fruits: loops of len 1 and 2
+    # Some additions may create cycles, checked below
+    no_existing_edges = ~s_bool
+    no_self_loops = ~torch.eye(d, dtype=torch.bool)
+    no_len2_loops = ~(s_bool.T)
+    q_table[:, :, 1] *= no_self_loops * no_len2_loops * no_existing_edges
+
     # Sample until legal action is obtained
     success = False
     while not success:
-        action = sample_action(q_table)
-        s_new, success = alter_edge(s, action)
+        a = sample_action(q_table)
+        s_new, success = alter_edge(s, a)
 
-    return s_new, action
+    return s_new, a

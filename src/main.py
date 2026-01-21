@@ -24,10 +24,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     if args["verbose"]:
         print("verbose")
     df = gen_data()
-
-
-
-    # policy_net = QNetwork(...) #arg here TODO
+    
     search(df)
 
 if __name__ == "__main__":

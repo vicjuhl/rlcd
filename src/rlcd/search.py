@@ -1,14 +1,19 @@
 import pandas as pd
 import torch
 from typing import Tuple, Literal
+from copy import deepcopy
 
 from rlcd.config import conf
 from rlcd.scoring import score
 from rlcd.actions import perform_legal_action
+from rlcd.model import QNetwork
 
 def run_episode(X: torch.Tensor, horizon: int) -> dict[str, torch.Tensor | int]:
     print(f"\nRunning episode with T={horizon}")
-    d = X.shape[1]
+    _, d = X.shape
+    q_online = QNetwork(d)
+    q_target = deepcopy(q_online)
+
     s = torch.zeros((d, d))
     l0 = score(s, X, 0)
     r = score(s, X, l0)
@@ -17,7 +22,7 @@ def run_episode(X: torch.Tensor, horizon: int) -> dict[str, torch.Tensor | int]:
     for t in range(horizon):
         if t % (horizon // 10) == 0:
             print(f"t = {t}")
-        s, a = perform_legal_action(s)
+        s, a = perform_legal_action(s, q_target)
         r = r - score(s, X, l0)
         # Store SARS TODO
     return {"state": s, "score": score(s, X, l0)}

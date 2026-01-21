@@ -13,7 +13,7 @@ def est_mle_W(
     lr=0.05,
     tol=1e-3,
     max_steps=5000,
-    verbose=True
+    verbose=False
 ) -> torch.Tensor:
     """
     Estimate weight matrix W for Laplace-noise linear model with convergence stopping.
@@ -47,12 +47,13 @@ def est_mle_W(
             break
         prev_W = W.clone().detach()
 
-    if verbose:
+    if max_change > tol:
+        print("Warning: weights optimization did not converge\n")
         print(f"Max change {max_change:.2e}")
-        if max_change > tol:
-            print("Warning: weights optimization did not converge\n")
-        else:
-            print(f"Converged in {step} steps.")
+    elif verbose:
+        print(f"Converged in {step} steps.")
+        print(f"Max change {max_change:.2e}")
+
     return (W * s).detach() # masking with DAG s as a safety measure
 
 def est_mles(s: torch.Tensor, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:

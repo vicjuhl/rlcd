@@ -26,15 +26,17 @@ def run_episode(
     xi = conf["xi"]
     # Initial state: no edges
     s = torch.zeros((d, d))
-    r = scorer.score(s) # =0
+    latest_score = scorer.score(s).reshape(1,) # =0
 
     for t in range(horizon):
         if t % (horizon // 10) == 0:
             print(f"t = {t}")
         s_next, a = perform_legal_action(s, q_target)
-        r = r - scorer.score(s_next)
+        r = (scorer.score(s_next) - latest_score).reshape(1,)
+
         memory.push(s, a, r, s_next)
         s = s_next
+        latest_score += r
         # Learn
         if len(memory) >= bs:
             batch = memory.sample(bs)

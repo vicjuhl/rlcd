@@ -14,18 +14,18 @@ class QNetwork(torch.nn.Module):
         """Returns batchsize Q-tables of dimension (bs, d, d, 3).
         Last dimension is 0 = remove, 1 = add, 2 = reverse
         """
-        batch_pass = len(s.shape) == 4
+        batch_pass = len(s.shape) == 3
         start_dim = 0
         if batch_pass: # batch pass
             bs = s.shape[0]
             start_dim = 1
-        s = s.flatten(start_dim=start_dim)
-        s = F.relu(self.fc1(s))
-        s = F.relu(self.fc2(s))
-        s = self.fc3(s)
+        x = s.flatten(start_dim=start_dim)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
         if batch_pass:
-            return s.view(bs, self.d, self.d, 3)
+            return x.view(bs, self.d, self.d, 3)
         else:
-            return s.view(self.d, self.d, 3)
+            return x.view(self.d, self.d, 3)
         
 

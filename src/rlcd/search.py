@@ -40,18 +40,24 @@ def run_episode(
         # Learn
         if len(memory) >= bs:
             batch = memory.sample(bs)
-            s_batch = torch.cat(batch.s)
-            a_batch = torch.cat(batch.a)
+            s_batch = torch.stack(batch.s)
+            a_batch = torch.stack(batch.a)
             r_batch = torch.cat(batch.r)
-            s_next_batch = torch.cat(batch.s_next)
+            s_next_batch = torch.stack(batch.s_next)
 
             # Q values
-            qval = q_online.forward(s_batch)
-            qval_selected = qval.gather(1, a_batch) # Q value of realized action
+            qval = q_online.forward(s_batch)  # (bs, d, d, 3)
+            # For batched actions, we need to gather based on coordinates [i, j] and action type
+            # qval is (bs, d, d, 3), a_batch is (bs, 3)
+            bs_size = qval.shape[0]
+            i_coords = a_batch[:, 0].long()
+            j_coords = a_batch[:, 1].long()
+            action_types = a_batch[:, 2].long()
+            qval_selected = qval[torch.arange(bs_size), i_coords, j_coords, action_types]  # (bs,)
 
             with torch.no_grad():
-                qval_target_next = q_target(s_next_batch)
-                legal_mask = filter_illegal_actions(qval_target_next)
+                qval_target_next = q_target(s_next_batch)  # (bs, d, d, 3)
+                legal_mask = filter_illegal_actions(s_batch)  # (bs, d, d, 3)
                 s_next_q_expectation = expectation_of_q(qval_target_next, legal_mask)
 
             td_target = r_batch + s_next_q_expectation * gamma
@@ -62,8 +68,9 @@ def run_episode(
             optim.step()
 
             # Update target weight with Polyak average
-            for t, o in zip(q_target.parameters(), q_online.parameters()):
-                t.copy_(xi * t + (1 - xi) * o)
+            with torch.no_grad():
+                for t, o in zip(q_target.parameters(), q_online.parameters()):
+                    t.copy_(xi * t + (1 - xi) * o)
 
 
     return {"state": s, "score": scorer.score(s)}

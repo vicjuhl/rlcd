@@ -15,7 +15,8 @@ def gen_dag() -> torch.Tensor:
         success = False
         while not success:
             i, j = torch.randint(0, N, (2,)).tolist()
-            dag, success = alter_edge(dag, ((i, j), 1))
+            action = torch.tensor([i, j, 1], dtype=torch.int64)  # action type 1 = add
+            dag, success = alter_edge(dag, action)
     
     # Topological order
     G = nx.DiGraph(dag.numpy())
@@ -23,7 +24,7 @@ def gen_dag() -> torch.Tensor:
     dag = dag[order][:, order]
     return dag
 
-def gen_funcs(dag):
+def gen_funcs(dag, noise_scale=1.):
     """Assign uniform [-1, 1] weights to edges; assign uniform [.25, 4] scales."""
     # Sample weights W
     N = conf["N"]
@@ -35,7 +36,7 @@ def gen_funcs(dag):
 
     # Sample scale b
     dist = torch.distributions.Gamma(2, 2)
-    b = dist.sample((N,))
+    b = dist.sample((N,)) / 10 * noise_scale
 
     return w, c, b
 
@@ -50,7 +51,7 @@ def gen_data():
     for i in range(N):
         mu = X @ w[:, i] + c[i]
         e = torch.distributions.Laplace(0.0, b[i]).sample((n,))
-        X[:, i] = mu + e / 10
+        X[:, i] = mu + e
 
     df = pd.DataFrame(X.numpy(), columns=[f"x{i+1}" for i in range(N)])
     
@@ -61,3 +62,29 @@ def gen_data():
     # print(df)
 
     return df
+
+def gen_data_from_dag(dag: torch.Tensor, n: int, noise_scale: float):
+    d = dag.shape[0]
+
+    # 1. Topological order
+    G = nx.DiGraph(dag.numpy())
+    order = torch.tensor(list(nx.topological_sort(G)))
+
+    # 2. Reorder DAG
+    dag_ord = dag[order][:, order]
+
+    # 3. Generate data in topological order
+    w, c, b = gen_funcs(dag_ord, noise_scale)
+    X = torch.zeros((n, d))
+    for i in range(d):
+        mu = X @ w[:, i] + c[i]
+        e = torch.distributions.Laplace(0.0, b[i]).sample((n,))
+        X[:, i] = mu + e
+
+    # 4. Invert permutation
+    inv_order = torch.argsort(order)
+
+    # 5. Restore original column order
+    X = X[:, inv_order]
+
+    return X.numpy()

@@ -8,6 +8,7 @@ from rlcd.model import QNetwork
 from rlcd.scoring import Scorer
 from rlcd.replay import Transition, ReplayBuffer
 from rlcd.utils import shd
+from rlcd.plotting import plot_episode_metrics
 
 def run_episode(
     X: torch.Tensor,
@@ -19,8 +20,6 @@ def run_episode(
     optim: torch.optim.AdamW,
     criterion: torch.nn.Module
 ) -> dict[str, torch.Tensor | int]:
-    
-    print(f"\nRunning episode with T={horizon}")
     _, d = X.shape
     bs = conf["batch_size"]
     gamma = conf["gamma"]
@@ -87,8 +86,12 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     criterion = torch.nn.SmoothL1Loss()
     # Maintain best seen graph
     best = {"state": torch.zeros((d, d)), "score": 0}
+    
     # Run episodes according to schedule
-    for T in conf["epoch_T_schedule"]:
+    esps_best_scores = []
+    epsd_best_shd = []
+    for epsd_num, T in enumerate(conf["epoch_T_schedule"]):
+        print(f"\nRunning episode {epsd_num} with T={T}")
         epsd_best = run_episode(X, T, q_online, q_target, scorer, memory, optim, criterion)
         print(f"Episode finalized with score {epsd_best["score"]}")
         if dag_gt is not None:
@@ -96,10 +99,25 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
             print(f"SHD: {shd_epsd}")
         if epsd_best["score"] > best["score"]:
             best = epsd_best.copy()
+        
+        epsd_best_shd.append(shd_epsd)
+        esps_best_scores.append(epsd_best["score"])
     print("\nTrue DAG:")
-    print(dag_gt if dag_gt is not None else "... is absent")
+    if dag_gt is not None:
+        print(dag_gt)
+        dag_gt_score = scorer.score(dag_gt)
+        print(f"with score {dag_gt_score} and degree {int(dag_gt.sum())}")
+    else:
+        print("... is absent")
     print("\nBest state:")
     print(best["state"])
-    print(f"with score {best["score"]}")
+    print(f"with score {best["score"]} and degree {int(dag_gt.sum())}")
     print(f"and SHD: {shd(best["state"], dag_gt)}")
+
+    plot_episode_metrics(
+        {"Best episode score": esps_best_scores, "SHD of best scoring graph": epsd_best_shd}
+        , l0=scorer.l0
+        , dag_gt_score=dag_gt_score
+    )
+
     return best["state"]

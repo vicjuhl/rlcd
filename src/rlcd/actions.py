@@ -100,13 +100,17 @@ def alter_edge(
         success: bool (whether the graph was indeed updated; no cycles found)
     """
     i, j, a = action[0].item(), action[1].item(), action[2].item()
+
     s_new = s_old.clone()
     match a:
         case 0: # remove
             s_new[i, j] = 0 # remove edge i, j
             return s_new, True
         case 1: # add
-            s_new[i, j] = 1 # add edge i, j
+            if (s_old[i, j] - 1).abs().item() < 1e-6: # edge already exists
+                return s_old, False
+            else:
+                s_new[i, j] = 1 # add edge i, j
         case 2: # reverse
             s_new[i, j] = 1 # add edge i, j
             s_new[j, i] = 0 # remove edge j, i

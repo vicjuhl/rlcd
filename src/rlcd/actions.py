@@ -122,13 +122,14 @@ def alter_edge(
     else: # cycles
         return s_old, False
     
-def sample_action(q_table: torch.Tensor) -> torch.Tensor:
-    tau = conf["tau"]
-    q_flat = q_table.flatten()
+def sample_action(q_flat: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:
+    d = int((len(q_flat) // 3)**.5)
+    q_shape = (d, d, 3)
+
     pi_flat = torch.softmax(q_flat / tau, dim=0)
     idx = torch.multinomial(pi_flat, num_samples=1)
-    i, j, a = torch.unravel_index(idx, q_table.shape)
-    return torch.tensor([i.item(), j.item(), a.item()], dtype=torch.int64)
+    i, j, a = torch.unravel_index(idx, q_shape)
+    return torch.stack([i, j, a]).squeeze().to(dtype=torch.int64, device=q_flat.device)
 
 def expectation_of_q(q_table: torch.Tensor, legal_mask: torch.Tensor) -> torch.Tensor:
     """Finds expectation of Q tables, one for each batch element."""
@@ -171,11 +172,13 @@ def perform_legal_action(
     no_self_loops = ~torch.eye(d, dtype=torch.bool)
     no_len2_loops = ~(s_bool.T)
     q_table[:, :, 1] *= no_self_loops * no_len2_loops * no_existing_edges
+    q_flat = q_table.flatten()
+    # The most likely action will be e^1 times more probable than the least likely action
+    tau = (q_flat.max() - q_flat.min()) / 1
 
     # Sample until legal action is obtained
     success = False
-    while not success:
-        a = sample_action(q_table)
+        a = sample_action(q_flat, tau)
         s_new, success = alter_edge(s, a)
 
     return s_new, a

@@ -10,7 +10,7 @@ class Scorer:
         self.X = X
 
         self.l0 = 0.
-        self.l0 = self.score(torch.zeros((d, d)), verbose=True) # likelihood of no-edge graph (which has no penalty)
+        self.l0 = self.score(torch.zeros((d, d))) # likelihood of no-edge graph (which has no penalty)
 
     def score(self, s: torch.Tensor, verbose=False) -> float:
         degree = s.sum()

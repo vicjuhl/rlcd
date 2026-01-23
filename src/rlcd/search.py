@@ -76,6 +76,7 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     d = len(df.columns)
     X = torch.tensor(df.values)
     scorer = Scorer(X)
+    print(f"l0: {scorer.l0}")
     # Neural network
     q_online = QNetwork(d)
     q_target = deepcopy(q_online)
@@ -88,7 +89,7 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     best = {"state": torch.zeros((d, d)), "score": 0}
     
     # Run episodes according to schedule
-    esps_best_scores = []
+    epsd_best_scores = []
     epsd_best_shd = []
     for epsd_num, T in enumerate(conf["epoch_T_schedule"]):
         print(f"\nRunning episode {epsd_num} with T={T}")
@@ -101,7 +102,7 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
             best = epsd_best.copy()
         
         epsd_best_shd.append(shd_epsd)
-        esps_best_scores.append(epsd_best["score"])
+        epsd_best_scores.append(epsd_best["score"])
     print("\nTrue DAG:")
     if dag_gt is not None:
         print(dag_gt)
@@ -115,8 +116,13 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     print(f"and SHD: {shd(best["state"], dag_gt)}")
 
     plot_episode_metrics(
-        {"Best episode score": esps_best_scores, "SHD of best scoring graph": epsd_best_shd}
-        , l0=scorer.l0
+        {"Best episode score": {
+            "unit": "graph score",
+            "results": epsd_best_scores
+        }, "SHD of best scoring graph": {
+            "unit": "SHD",
+            "results": epsd_best_shd
+        }}
         , dag_gt_score=dag_gt_score
     )
 

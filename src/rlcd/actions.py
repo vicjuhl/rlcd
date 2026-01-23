@@ -1,5 +1,6 @@
 import torch
 from typing import Tuple
+from itertools import count
 
 from rlcd.config import conf
 from rlcd.model import QNetwork
@@ -122,14 +123,10 @@ def alter_edge(
     else: # cycles
         return s_old, False
     
-def sample_action(q_flat: torch.Tensor, tau: torch.Tensor) -> torch.Tensor:
-    d = int((len(q_flat) // 3)**.5)
-    q_shape = (d, d, 3)
-
-    pi_flat = torch.softmax(q_flat / tau, dim=0)
+def sample_action(q_shape: torch.Size, pi_flat: torch.Tensor) -> torch.Tensor:
     idx = torch.multinomial(pi_flat, num_samples=1)
     i, j, a = torch.unravel_index(idx, q_shape)
-    return torch.stack([i, j, a]).squeeze().to(dtype=torch.int64, device=q_flat.device)
+    return torch.stack([i, j, a]).squeeze().to(dtype=torch.int64, device=pi_flat.device)
 
 def expectation_of_q(q_table: torch.Tensor, legal_mask: torch.Tensor) -> torch.Tensor:
     """Finds expectation of Q tables, one for each batch element."""
@@ -160,25 +157,40 @@ def perform_legal_action(
     d = s.shape[0]
     s_bool = s.bool()
     q_table = q_network.forward(s) # (d, d, 3)
+    # The most likely action will be e^1 times more probable than the least likely action
+    tau = q_table.max() - q_table.min()
+    tau = tau if tau > 1e-6 else 1.0
 
     # Filter removals and reversals (all existing edges)
     # Some reversals may create cycles, checked below
-    q_table[:, :, 0] *= s_bool
-    q_table[:, :, 2] *= s_bool
-
+    mask_removal = s_bool
+    mask_flip    = s_bool
     # Filter additions. Only low-hanging fruits: loops of len 1 and 2
     # Some additions may create cycles, checked below
     no_existing_edges = ~s_bool
     no_self_loops = ~torch.eye(d, dtype=torch.bool)
     no_len2_loops = ~(s_bool.T)
-    q_table[:, :, 1] *= no_self_loops * no_len2_loops * no_existing_edges
+    mask_add      = no_self_loops * no_len2_loops * no_existing_edges
+
+    q_table[:, :, 0] = torch.where(mask_removal, q_table[:, :, 0], torch.full_like(q_table[:, :, 0], -1e6))
+    q_table[:, :, 2] = torch.where(mask_flip,    q_table[:, :, 2], torch.full_like(q_table[:, :, 2], -1e6))
+    q_table[:, :, 1] = torch.where(mask_add,     q_table[:, :, 1], torch.full_like(q_table[:, :, 1], -1e6))
+
     q_flat = q_table.flatten()
-    # The most likely action will be e^1 times more probable than the least likely action
-    tau = (q_flat.max() - q_flat.min()) / 1
+    pi_flat = torch.softmax(q_flat / tau, dim=0)
 
     # Sample until legal action is obtained
     success = False
-        a = sample_action(q_flat, tau)
+    warning_printed = False
+    for i in count():
+        a = sample_action(q_table.shape, pi_flat)
         s_new, success = alter_edge(s, a)
+        if success:
+            break
+        if i > 100 and not warning_printed:
+            print("Failing to find action...")
+            print(s.int())
+            print(q_table)
+            warning_printed = True
 
     return s_new, a

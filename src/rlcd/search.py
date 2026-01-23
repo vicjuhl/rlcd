@@ -26,7 +26,9 @@ def run_episode(
     xi = conf["xi"]
     # Initial state: no edges
     s = torch.zeros((d, d))
+    s_best = s.clone()
     latest_score = scorer.score(s).reshape(1,) # =0
+    best_score = latest_score.clone()
 
     for t in range(horizon):
         s_next, a = perform_legal_action(s, q_target)
@@ -35,6 +37,11 @@ def run_episode(
         memory.push(s, a, r, s_next)
         s = s_next
         latest_score += r
+
+        if latest_score > best_score:
+            s_best[:, :] = s
+            best_score = latest_score.clone()
+        
         # Learn
         if len(memory) >= bs:
             batch = memory.sample(bs)
@@ -70,7 +77,8 @@ def run_episode(
                 for t, o in zip(q_target.parameters(), q_online.parameters()):
                     t.copy_(xi * t + (1 - xi) * o)
 
-    return {"state": s, "score": scorer.score(s)}
+    assert best_score == scorer.score(s_best), f"{best_score}, {scorer.score(s_best)}"
+    return {"state": s_best, "score": best_score}
 
 def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     d = len(df.columns)
@@ -94,7 +102,7 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     for epsd_num, T in enumerate(conf["epoch_T_schedule"]):
         print(f"\nRunning episode {epsd_num} with T={T}")
         epsd_best = run_episode(X, T, q_online, q_target, scorer, memory, optim, criterion)
-        print(f"Episode finalized with score {epsd_best["score"]}")
+        print(f"Episode finalized with score {epsd_best["score"].item()}")
         if dag_gt is not None:
             shd_epsd = shd(epsd_best["state"], dag_gt)
             print(f"SHD: {shd_epsd}")

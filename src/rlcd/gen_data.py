@@ -24,12 +24,12 @@ def gen_dag() -> torch.Tensor:
     dag = dag[order][:, order]
     return dag
 
-def gen_funcs(dag, noise_scale=1.):
+def gen_funcs(dag, noise_scale):
     """Assign uniform [-1, 1] weights to edges; assign uniform [.25, 4] scales."""
     # Sample weights W
     N = conf["N"]
-    more_w = torch.empty_like(dag).uniform_(-1, 1)
-    w = dag * more_w
+    w_excess = torch.empty_like(dag).uniform_(-1, 1) ** 3
+    w = dag * w_excess
 
     # Sample bias
     c = torch.empty((N,)).uniform_(-1, 1)
@@ -40,12 +40,12 @@ def gen_funcs(dag, noise_scale=1.):
 
     return w, c, b
 
-def gen_data():
+def gen_data(dag: torch.Tensor) -> pd.DataFrame:
     N = conf["N"]
-    n = conf.get("n_samples", 1000)
+    n = conf["n"]
+    noise_scale = conf["noise_scale"]
     
-    dag = gen_dag()
-    w, c, b = gen_funcs(dag)
+    w, c, b = gen_funcs(dag, noise_scale)
 
     X = torch.zeros((n, N))
     for i in range(N):
@@ -55,11 +55,11 @@ def gen_data():
 
     df = pd.DataFrame(X.numpy(), columns=[f"x{i+1}" for i in range(N)])
     
-    # print(dag)
-    # print(w)
-    # print(c)
-    # print(b)
-    # print(df)
+    print(dag.int())
+    print(w)
+    print(c)
+    print(b)
+    print(df)
 
     return df
 

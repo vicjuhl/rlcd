@@ -1,6 +1,5 @@
 import pandas as pd
 import torch
-from typing import Tuple, Literal
 from copy import deepcopy
 
 from rlcd.config import conf
@@ -8,6 +7,7 @@ from rlcd.actions import perform_legal_action, filter_illegal_actions, expectati
 from rlcd.model import QNetwork
 from rlcd.scoring import Scorer
 from rlcd.replay import Transition, ReplayBuffer
+from rlcd.utils import shd
 
 def run_episode(
     X: torch.Tensor,
@@ -19,6 +19,7 @@ def run_episode(
     optim: torch.optim.AdamW,
     criterion: torch.nn.Module
 ) -> dict[str, torch.Tensor | int]:
+    
     print(f"\nRunning episode with T={horizon}")
     _, d = X.shape
     bs = conf["batch_size"]
@@ -29,10 +30,8 @@ def run_episode(
     latest_score = scorer.score(s).reshape(1,) # =0
 
     for t in range(horizon):
-        if t % (horizon // 10) == 0:
-            print(f"t = {t}")
         s_next, a = perform_legal_action(s, q_target)
-        r = (scorer.score(s_next) - latest_score).reshape(1,)
+        r = (scorer.score(s_next) - latest_score)
 
         memory.push(s, a, r, s_next)
         s = s_next
@@ -72,10 +71,9 @@ def run_episode(
                 for t, o in zip(q_target.parameters(), q_online.parameters()):
                     t.copy_(xi * t + (1 - xi) * o)
 
-
     return {"state": s, "score": scorer.score(s)}
 
-def search(df: pd.DataFrame) -> torch.Tensor:
+def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     d = len(df.columns)
     X = torch.tensor(df.values)
     scorer = Scorer(X)
@@ -84,7 +82,7 @@ def search(df: pd.DataFrame) -> torch.Tensor:
     q_target = deepcopy(q_online)
     q_online.train()
     # Replay and optimimization
-    memory = ReplayBuffer(1000)
+    memory = ReplayBuffer(100000)
     optim = torch.optim.AdamW(q_online.parameters(), conf["Q_lr"], amsgrad=True)
     criterion = torch.nn.SmoothL1Loss()
     # Maintain best seen graph
@@ -92,9 +90,16 @@ def search(df: pd.DataFrame) -> torch.Tensor:
     # Run episodes according to schedule
     for T in conf["epoch_T_schedule"]:
         epsd_best = run_episode(X, T, q_online, q_target, scorer, memory, optim, criterion)
+        print(f"Episode finalized with score {epsd_best["score"]}")
+        if dag_gt is not None:
+            shd_epsd = shd(epsd_best["state"], dag_gt)
+            print(f"SHD: {shd_epsd}")
         if epsd_best["score"] > best["score"]:
             best = epsd_best.copy()
+    print("\nTrue DAG:")
+    print(dag_gt if dag_gt is not None else "... is absent")
     print("\nBest state:")
     print(best["state"])
     print(f"with score {best["score"]}")
+    print(f"and SHD: {shd(best["state"], dag_gt)}")
     return best["state"]

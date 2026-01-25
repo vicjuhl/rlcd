@@ -62,7 +62,7 @@ def run_episode(
 
             with torch.no_grad():
                 qval_target_next = q_target(s_next_batch)  # (bs, d, d, 3)
-                legal_mask = filter_illegal_actions(s_batch)  # (bs, d, d, 3)
+                legal_mask = filter_illegal_actions(s_next_batch)  # (bs, d, d, 3)
                 s_next_q_expectation = expectation_of_q(qval_target_next, legal_mask)
 
             td_target = r_batch + s_next_q_expectation * gamma

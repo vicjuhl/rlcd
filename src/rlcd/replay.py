@@ -3,7 +3,7 @@ from collections import namedtuple, deque
 
 Transition = namedtuple(
     'Transition',
-    ('s', 'a', 'r', 's_next')
+    ('s', 'a', 'r', 's_next', 'terminal')
 )
 
 class ReplayBuffer:

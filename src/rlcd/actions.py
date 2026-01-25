@@ -157,8 +157,8 @@ def perform_legal_action(
     d = s.shape[0]
     s_bool = s.bool()
     q_table = q_network.forward(s) # (d, d, 3)
-    # The most likely action will be e^1 times more probable than the least likely action
-    tau = q_table.max() - q_table.min()
+    # The most likely action will be e^2 times more probable than the least likely action
+    tau = (q_table.max() - q_table.min()) / 2
     tau = tau if tau > 1e-6 else 1.0
 
     # Filter removals and reversals (all existing edges)

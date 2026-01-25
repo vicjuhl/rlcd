@@ -30,7 +30,7 @@ class Scorer:
             print(f"Z = l - l0 - beta * degree: {l - self.l0 - self.beta * degree}")
             print()
 
-        return (l - self.l0 - self.beta * degree) * reward_scale
+        return (l - self.l0) * reward_scale - self.beta * degree
         
     def est_mle_W_adam(
         self,

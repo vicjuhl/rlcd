@@ -36,8 +36,9 @@ def run_episode(
         s_next, a = perform_legal_action(s, q_target)
         next_score = scorer.score(s_next)
         r = ((next_score - score) - torch.tensor(step_penalty)).reshape(1,)
+        terminal = torch.tensor([(t == horizon - 1)], dtype=bool).reshape(1,)
 
-        memory.push(s, a, r, s_next)
+        memory.push(s, a, r, s_next, terminal)
         s = s_next
         score = next_score.clone()
 
@@ -52,9 +53,10 @@ def run_episode(
             a_batch = torch.stack(batch.a)
             r_batch = torch.cat(batch.r)
             s_next_batch = torch.stack(batch.s_next)
+            term_batch = torch.cat(batch.terminal)
 
             # Q values
-            qval = q_online.forward(s_batch)  # (bs, d, d, 3)
+            qval = q_online.forward(s_batch, term_batch)  # (bs, d, d, 3)
             # For batched actions, we need to gather based on coordinates [i, j] and action type
             # qval is (bs, d, d, 3), a_batch is (bs, 3)
             bs_size = qval.shape[0]
@@ -64,14 +66,13 @@ def run_episode(
             qval_selected = qval[torch.arange(bs_size), i_coords, j_coords, action_types]  # (bs,)
 
             with torch.no_grad():
-                qval_target_next = q_target(s_next_batch)  # (bs, d, d, 3)
+                qval_target_next = q_target.forward(s_next_batch, term_batch)  # (bs, d, d, 3)
                 legal_mask = filter_illegal_actions(s_next_batch)  # (bs, d, d, 3)
                 s_next_q_expectation = expectation_of_q(qval_target_next, legal_mask)
 
-            td_target = r_batch + s_next_q_expectation * gamma
+            td_target = r_batch + (~term_batch).float() * (gamma * s_next_q_expectation)
 
-            # print(f"target:\t {td_target.mean().item()},\tpred:\t{qval_selected.mean().item()}")
-            print(f"δ:\t {td_target.mean().item() - qval_selected.mean().item():.4}, target:\t {td_target.mean().item():.4} pred:\t{qval_selected.mean().item():.4}")
+            # print(f"δ:\t {td_target.mean().item() - qval_selected.mean().item():.4}, target:\t {td_target.mean().item():.4} pred:\t{qval_selected.mean().item():.4},\t, r: {r_batch.mean():.4}")
 
             loss = criterion(qval_selected, td_target)
             optim.zero_grad()
@@ -108,7 +109,7 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     for epsd_num, T in enumerate(conf["epoch_T_schedule"]):
         print(f"\nRunning episode {epsd_num} with T={T}")
         epsd_best = run_episode(X, T, q_online, q_target, scorer, memory, optim, criterion)
-        print(f"Episode finalized with score {epsd_best["score"].item()}")
+        print(f"Episode finalized with score {epsd_best["score"].item()} and degree {int(epsd_best["score"].sum().item())}")
         if dag_gt is not None:
             shd_epsd = shd(epsd_best["state"], dag_gt)
             print(f"SHD: {shd_epsd}")
@@ -116,7 +117,7 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
             best = epsd_best.copy()
         
         epsd_best_shd.append(shd_epsd)
-        epsd_best_scores.append(epsd_best["score"])
+        epsd_best_scores.append(epsd_best["score"].item())
     print("\nTrue DAG:")
     if dag_gt is not None:
         print(dag_gt)

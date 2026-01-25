@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import pathlib as pl
+import numpy as np
 
 output_dir = pl.Path(__file__).parent.parent.parent / 'results' / 'figures'
 output_dir.mkdir(parents=True, exist_ok=True)
@@ -14,6 +15,9 @@ def plot_episode_metrics(
 
     for i, (metric_name, metric_info) in enumerate(results_dict.items()):
         results = metric_info["results"]
+        res_np = np.array([results[0]] * 10 + results)
+        roll_avg_res = np.array([res_np[i : i+10].mean() for i in range(len(results))])
+
         unit = metric_info.get("unit", "")
 
         if i == 0:
@@ -26,15 +30,15 @@ def plot_episode_metrics(
 
         # plot metric
         color = colors[i % len(colors)]
-        current_ax.plot(results, label=f"{metric_name} ({unit})", color=color)
+        current_ax.plot(roll_avg_res, label=f"{metric_name} ({unit})", color=color)
         current_ax.set_ylabel(f"{metric_name} ({unit})", color=color)
         current_ax.tick_params(axis='y', colors=color)
 
-        # dag_gt_score only for "Best episode score"
-        if dag_gt_score is not None and metric_name == "Best episode score":
-            current_ax.axhline(y=dag_gt_score, color='r', linestyle='--', label='Score of true DAG')
-
         current_ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+
+        # dag_gt_score only for "Best episode score"
+        if dag_gt_score is not None and unit == "graph score":
+            current_ax.axhline(y=dag_gt_score, color='r', linestyle='--', label='Score of true DAG')
 
     # create combined legend
     lines, labels = [], []

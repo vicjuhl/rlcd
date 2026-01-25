@@ -10,6 +10,8 @@ from rlcd.replay import Transition, ReplayBuffer
 from rlcd.utils import shd
 from rlcd.plotting import plot_episode_metrics
 
+step_penalty = conf["step_penalty"]
+
 def run_episode(
     X: torch.Tensor,
     horizon: int,
@@ -27,20 +29,21 @@ def run_episode(
     # Initial state: no edges
     s = torch.zeros((d, d))
     s_best = s.clone()
-    latest_score = scorer.score(s).reshape(1,) # =0
-    best_score = latest_score.clone()
+    score = scorer.score(s).reshape(1,) # =0
+    best_score = score.clone()
 
     for t in range(horizon):
         s_next, a = perform_legal_action(s, q_target)
-        r = (scorer.score(s_next) - latest_score)
+        next_score = scorer.score(s_next)
+        r = ((next_score - score) - torch.tensor(step_penalty)).reshape(1,)
 
         memory.push(s, a, r, s_next)
         s = s_next
-        latest_score += r
+        score = next_score.clone()
 
-        if latest_score > best_score:
+        if score > best_score:
             s_best[:, :] = s
-            best_score = latest_score.clone()
+            best_score = score.clone()
         
         # Learn
         if len(memory) >= bs:
@@ -66,6 +69,9 @@ def run_episode(
                 s_next_q_expectation = expectation_of_q(qval_target_next, legal_mask)
 
             td_target = r_batch + s_next_q_expectation * gamma
+
+            # print(f"target:\t {td_target.mean().item()},\tpred:\t{qval_selected.mean().item()}")
+            print(f"δ:\t {td_target.mean().item() - qval_selected.mean().item():.4}, target:\t {td_target.mean().item():.4} pred:\t{qval_selected.mean().item():.4}")
 
             loss = criterion(qval_selected, td_target)
             optim.zero_grad()
@@ -94,7 +100,7 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     optim = torch.optim.AdamW(q_online.parameters(), conf["Q_lr"], amsgrad=True)
     criterion = torch.nn.SmoothL1Loss()
     # Maintain best seen graph
-    best = {"state": torch.zeros((d, d)), "score": 0}
+    best = {"state": torch.zeros((d, d)), "score": torch.zeros((1,))}
     
     # Run episodes according to schedule
     epsd_best_scores = []
@@ -115,22 +121,25 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     if dag_gt is not None:
         print(dag_gt)
         dag_gt_score = scorer.score(dag_gt)
-        print(f"with score {dag_gt_score} and degree {int(dag_gt.sum())}")
+        print(f"with score {dag_gt_score.item()} and degree {int(dag_gt.sum())}")
     else:
         print("... is absent")
     print("\nBest state:")
     print(best["state"])
-    print(f"with score {best["score"]} and degree {int(dag_gt.sum())}")
+    print(f"with score {best["score"].item()} and degree {int(dag_gt.sum())}")
     print(f"and SHD: {shd(best["state"], dag_gt)}")
 
     plot_episode_metrics(
-        {"Best episode score": {
-            "unit": "graph score",
-            "results": epsd_best_scores
-        }, "SHD of best scoring graph": {
-            "unit": "SHD",
-            "results": epsd_best_shd
-        }}
+        {
+            "Best episode score": {
+                "unit": "graph score",
+                "results": epsd_best_scores
+            },
+            # "SHD of best scoring graph": {
+            #     "unit": "SHD",
+            #     "results": epsd_best_shd
+            # }
+        }
         , dag_gt_score=dag_gt_score
     )
 

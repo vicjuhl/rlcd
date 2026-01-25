@@ -3,16 +3,20 @@ from typing import Tuple
 
 from rlcd.config import conf
 
+reward_scale = conf["reward_scale"]
+
 class Scorer:
     def __init__(self, X: torch.Tensor):
         _, d = X.shape
         self.beta = conf["beta"]
         self.X = X
 
-        self.l0 = 0.
-        self.l0 = self.score(torch.zeros((d, d))) # likelihood of no-edge graph (which has no penalty)
+        # Set l0 to the raw likelihood of the empty graph (baseline for comparison)
+        W_empty = self.est_mle_W_lbfgs(torch.zeros((d, d)))
+        b_empty = self.est_mle_b(W_empty)
+        self.l0 = self.logllhood(b_empty)  # raw likelihood, not scaled
 
-    def score(self, s: torch.Tensor, verbose=False) -> float:
+    def score(self, s: torch.Tensor, verbose=False) -> torch.Tensor:
         degree = s.sum()
         W = self.est_mle_W_lbfgs(s)
         b = self.est_mle_b(W)
@@ -26,8 +30,8 @@ class Scorer:
             print(f"Z = l - l0 - beta * degree: {l - self.l0 - self.beta * degree}")
             print()
 
-        return l - self.l0 - self.beta * degree
-
+        return (l - self.l0 - self.beta * degree) * reward_scale
+        
     def est_mle_W_adam(
         self,
         s: torch.Tensor,

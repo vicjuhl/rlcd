@@ -106,10 +106,10 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     # Run episodes according to schedule
     epsd_best_scores = []
     epsd_best_shd = []
-    for epsd_num, T in enumerate(conf["epoch_T_schedule"]):
+    for epsd_num, T in enumerate([conf["T"]] * conf["num_episodes"]):
         print(f"\nRunning episode {epsd_num} with T={T}")
         epsd_best = run_episode(X, T, q_online, q_target, scorer, memory, optim, criterion)
-        print(f"Episode finalized with score {epsd_best["score"].item()} and degree {int(epsd_best["score"].sum().item())}")
+        print(f"Episode best score {epsd_best["score"].item()} with degree {int(epsd_best["score"].sum().item())}")
         if dag_gt is not None:
             shd_epsd = shd(epsd_best["state"], dag_gt)
             print(f"SHD: {shd_epsd}")
@@ -136,10 +136,10 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
                 "unit": "graph score",
                 "results": epsd_best_scores
             },
-            # "SHD of best scoring graph": {
-            #     "unit": "SHD",
-            #     "results": epsd_best_shd
-            # }
+            "SHD of best scoring graph": {
+                "unit": "SHD",
+                "results": epsd_best_shd
+            }
         }
         , dag_gt_score=dag_gt_score
     )

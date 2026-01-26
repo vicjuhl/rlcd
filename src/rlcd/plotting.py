@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import pathlib as pl
 import numpy as np
 
+from rlcd.config import conf
+
 output_dir = pl.Path(__file__).parent.parent.parent / 'results' / 'figures'
 output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -49,4 +51,4 @@ def plot_episode_metrics(
     ax.legend(lines, labels, loc='upper left')
 
     ax.set_xlabel('Episode')
-    plt.savefig(output_dir / 'episode_results.png')
+    plt.savefig(output_dir / f'episode_results_{"_".join([k + "=" + str(v) for k, v in conf.items()])}_.png')

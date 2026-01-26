@@ -28,8 +28,9 @@ def gen_funcs(dag, noise_scale):
     """Assign weights to edges; assign uniform scales."""
     # Sample weights W
     d = conf["d"]
-    N = conf["N"]
-    w_excess = torch.empty_like(dag).uniform_(-1, 1) ** 3
+    w_excess = torch.empty_like(dag).uniform_(-2, 2)
+    while (w_excess.abs() < 1).any():
+        w_excess[w_excess.abs() < 1] *= 2
     w = dag * w_excess
 
     # Sample bias

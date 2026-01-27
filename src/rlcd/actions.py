@@ -5,6 +5,8 @@ from itertools import count
 from rlcd.config import conf
 from rlcd.model import QNetwork
 
+tau_prime = conf["tau_prime"]
+
 def makes_cycles(s: torch.Tensor, new_edge: Tuple[int, int]) -> bool:
     """Asses whether the addition of new_edge creates cycle(s)."""
     new_parent, new_child = new_edge
@@ -130,8 +132,8 @@ def sample_action(q_shape: torch.Size, pi_flat: torch.Tensor) -> torch.Tensor:
 
 def expectation_of_q(q_table: torch.Tensor, legal_mask: torch.Tensor) -> torch.Tensor:
     """Finds expectation of Q tables, one for each batch element."""
-    tau = conf["tau"]
     bs = q_table.shape[0]
+    tau = tau_from_q(q_table)
 
     # Flatten per batch
     q_flat = q_table.clone().view(bs, -1) # (bs, d*d)
@@ -142,6 +144,12 @@ def expectation_of_q(q_table: torch.Tensor, legal_mask: torch.Tensor) -> torch.T
 
     pi = torch.softmax(q_flat / tau, dim=1)
     return (pi * q_flat).sum(dim=1) # (bs,)
+
+def tau_from_q(q_table: torch.Tensor) -> float:
+    # The most likely action will be e^tau_prime times more probable than the least likely action
+    tau = ((q_table.max() - q_table.min()) / tau_prime).item()
+    tau = tau if tau > 1e-6 else 1.0
+    return tau
 
 def perform_legal_action(
     s: torch.Tensor,
@@ -157,9 +165,7 @@ def perform_legal_action(
     d = s.shape[0]
     s_bool = s.bool()
     q_table = q_network.forward(s) # (d, d, 3)
-    # The most likely action will be e^2 times more probable than the least likely action
-    tau = (q_table.max() - q_table.min()) / 2
-    tau = tau if tau > 1e-6 else 1.0
+    tau = tau_from_q(q_table)
 
     # Filter removals and reversals (all existing edges)
     # Some reversals may create cycles, checked below

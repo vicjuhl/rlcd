@@ -112,7 +112,7 @@ def plot_experiment_scores(
     plt.savefig(time_out_dir / f"global_results.png", bbox_inches="tight")
     plt.close()
 
-def plot_adj_matrix(adj: torch.Tensor, w: torch.Tensor):
+def plot_adj_matrix(adj: torch.Tensor, mat_num: int):
     """
     Plots a binary adjacency matrix.
     
@@ -121,7 +121,9 @@ def plot_adj_matrix(adj: torch.Tensor, w: torch.Tensor):
     """
     plt.imshow(adj, cmap='Blues', interpolation='none')
     plt.colorbar(label='Value')
+    plt.title(f"Adjacency matrix of {'true DAG' if mat_num == -1 else f'run {mat_num}'}")
     plt.xticks(range(adj.shape[0]))
     plt.yticks(range(adj.shape[0]))
-    plt.savefig(time_out_dir / f"true_DAG.png", bbox_inches="tight")
+    file_name = "true_DAG" if mat_num == -1 else f"matrix_{mat_num}"
+    plt.savefig(time_out_dir / f"{file_name}.png", bbox_inches="tight")
     plt.close()

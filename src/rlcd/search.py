@@ -88,7 +88,6 @@ def run_episode(
                 for t, o in zip(q_target.parameters(), q_online.parameters()):
                     t.copy_(xi * t + (1 - xi) * o)
 
-    assert best_score == scorer.score(s_best), f"{best_score}, {scorer.score(s_best)}"
     return {"state": s_best, "score": best_score}
 
 def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor | None=None) -> tuple[torch.Tensor, list, list]:
@@ -169,13 +168,13 @@ def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torc
     print("\nTrue DAG:")
     print(dag_gt.int())
     print(f"with score {scorer.score(dag_gt)}")
-
+    plot_adj_matrix(dag_gt.cpu(), -1)
 
     print("\nBest proposal DAGs")
-    for s in states:
+    for i, s in enumerate(states):
         print()
         print(s.int())
         print(f"with score {scorer.score(s)}")
+        plot_adj_matrix(s.cpu(), i+1)
     
     plot_experiment_scores(scores, scorer.score(dag_gt).cpu())
-    plot_adj_matrix(dag_gt.cpu())

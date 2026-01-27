@@ -12,6 +12,7 @@ time_out_dir.mkdir(parents=True, exist_ok=True)
 
 def plot_episode_metrics(
     results_dict: dict[str, dict],
+    exp_num: int,
     dag_gt_score: float | None = None
 ):
     _, ax = plt.subplots()
@@ -67,7 +68,7 @@ def plot_episode_metrics(
     ax.set_xlabel('Episode')
     plt.subplots_adjust(right=0.9)
     plt.savefig(
-        time_out_dir / f'episode_results_{"_".join([k + "=" + str(v) for k, v in conf.items()])}_window={window}.png',
+        time_out_dir / f'expnum={exp_num}_episode_results_{"_".join([k + "=" + str(v) for k, v in conf.items()])}_window={window}.png',
         bbox_inches="tight"
     )
     plt.close()
@@ -81,22 +82,22 @@ def plot_experiment_scores(
 
     window = conf["num_episodes"] // 20
     scores_np = [np.array(s) for s in scores]
-    n_series = len(scores)
     colors = plt.cm.tab10.colors
+
 
     _, ax = plt.subplots()
 
+    roll_avgs = []
     for i, s in enumerate(scores_np):
         lbl = f"Series {i+1}"
         roll_avg = np.array([s[max(0, j-window):j+1].mean() for j in range(len(s))])
-        roll_median = np.array([np.median(s[max(0, j-window):j+1]) for j in range(len(s))])
-
-        ax.plot(roll_avg, label=f"{lbl} rolling avg", color=colors[i % len(colors)])
+        roll_avgs.append(roll_avg)
+        ax.plot(roll_avg, label=f"{lbl} rolling avg", color=colors[i % len(colors)], lw=.5)
 
     # median across series at each episode
-    all_scores_array = np.array(scores_np)  # shape (n_series, n_episodes)
+    all_scores_array = np.array(roll_avgs)  # shape (n_series, n_episodes)
     median_across_series = np.median(all_scores_array, axis=0)
-    ax.plot(median_across_series, label="Median across series", color='black', linestyle='--')
+    ax.plot(median_across_series, label="Median across series", color='black')
 
     if dag_gt_score is not None:
         ax.axhline(y=dag_gt_score, color='r', linestyle='--', label='DAG GT Score')

@@ -90,7 +90,7 @@ def run_episode(
     assert best_score == scorer.score(s_best), f"{best_score}, {scorer.score(s_best)}"
     return {"state": s_best, "score": best_score}
 
-def search(X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor | None=None) -> tuple[torch.Tensor, list, list]:
+def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor | None=None) -> tuple[torch.Tensor, list, list]:
     _, d = X.shape
     # Neural network
     q_online = QNetwork(d)
@@ -141,6 +141,7 @@ def search(X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor | None=None) ->
                 "results": epsd_best_shd
             }
         }
+        , exp_num
         , dag_gt_score=dag_gt_score
     )
 
@@ -154,8 +155,8 @@ def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torc
     states = []
     scores = []
     shds = []
-    for _ in range(k_experiments):
-        state, exp_scores, exp_shds = search(X, scorer, dag_gt)
+    for i in range(k_experiments):
+        state, exp_scores, exp_shds = search(i, X, scorer, dag_gt)
         states.append(state)
         scores.append(exp_scores)
         shds.append(exp_shds)

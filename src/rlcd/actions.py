@@ -6,12 +6,13 @@ from rlcd.config import conf
 from rlcd.model import QNetwork
 
 tau_prime = conf["tau_prime"]
+device = conf["device"]
 
 def makes_cycles(s: torch.Tensor, new_edge: Tuple[int, int]) -> bool:
     """Asses whether the addition of new_edge creates cycle(s)."""
     new_parent, new_child = new_edge
     N = s.shape[0]
-    affected = torch.zeros(N)
+    affected = torch.zeros(N, device=device)
     affected[new_child] = 1 # Follow paths starting at new child
     while affected.max() > 0:
         affected = affected @ s # update which nodes are affected
@@ -23,7 +24,7 @@ def filter_illegal_actions_bruteforce(s: torch.Tensor) -> torch.Tensor:
     """Create legals mask tensor where True = legal edge addition, False = illegal edge addition."""
     d, _ = s.shape
     no_existing_edges = ~s.bool()
-    no_self_loops = ~torch.eye(d, dtype=torch.bool)
+    no_self_loops = ~torch.eye(d, dtype=torch.bool, device=device)
     no_len2_loops = ~s.T.bool()
     legals = no_self_loops & no_len2_loops & no_existing_edges # all actions legal, except short loops
     unchecked = legals.clone()
@@ -66,7 +67,7 @@ def filter_illegal_actions(s: torch.Tensor) -> torch.Tensor:
     s_bool = s.bool()
     
     # Forbid self-loops and addition of existing edges
-    no_self_loops = ~torch.eye(d, dtype=torch.bool, device=s.device)  # (d, d)
+    no_self_loops = ~torch.eye(d, dtype=torch.bool, device=device)  # (d, d)
     no_existing_edges = ~s_bool  # (batch_size, d, d)
     
     # Forbid edges that would create cycles (i, j) when i is reachable from j
@@ -171,7 +172,7 @@ def perform_legal_action(
     # Filter additions. Only low-hanging fruits: loops of len 1 and 2
     # Some additions may create cycles, checked below
     no_existing_edges = ~s_bool
-    no_self_loops = ~torch.eye(d, dtype=torch.bool)
+    no_self_loops = ~torch.eye(d, dtype=torch.bool, device=device)
     no_len2_loops = ~(s_bool.T)
     mask_add      = no_self_loops * no_len2_loops * no_existing_edges
 

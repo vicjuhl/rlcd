@@ -4,6 +4,7 @@ from typing import Tuple
 from rlcd.config import conf
 
 reward_scale = conf["reward_scale"]
+device = conf["device"]
 
 class Scorer:
     def __init__(self, X: torch.Tensor):
@@ -12,7 +13,7 @@ class Scorer:
         self.X = X
 
         # Set l0 to the raw likelihood of the empty graph (baseline for comparison)
-        W_empty = self.est_mle_W_lbfgs(torch.zeros((d, d)))
+        W_empty = self.est_mle_W_lbfgs(torch.zeros((d, d), device=device))
         b_empty = self.est_mle_b(W_empty)
         self.l0 = self.logllhood(b_empty)  # raw likelihood, not scaled
 
@@ -51,7 +52,7 @@ class Scorer:
         verbose: print convergence info
         """
         _, d = self.X.shape
-        W = torch.zeros((d, d), requires_grad=True)
+        W = torch.zeros((d, d), requires_grad=True, device=device)
         optimizer = torch.optim.Adam([W], lr=lr)
 
         prev_W = W.clone().detach()
@@ -100,7 +101,7 @@ class Scorer:
         verbose: print convergence info
         """
         _, d = self.X.shape
-        W = torch.zeros((d, d), requires_grad=True)
+        W = torch.zeros((d, d), requires_grad=True, device=device)
         optimizer = torch.optim.LBFGS(
             [W],
             lr=lr,
@@ -155,8 +156,8 @@ class Scorer:
         Each column solved independently to convergence.
         """
         X = self.X
-        N, d = X.shape
-        W = torch.zeros((d, d), device=X.device)
+        _, d = X.shape
+        W = torch.zeros((d, d), device=device)
 
         for j in range(d):
             parents = torch.where(s[:, j] != 0)[0]
@@ -164,7 +165,7 @@ class Scorer:
                 continue
 
             Xp = X[:, parents]
-            w = torch.zeros(len(parents), device=X.device)
+            w = torch.zeros(len(parents), device=device)
 
             prev_obj = float("inf")
 

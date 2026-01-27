@@ -13,6 +13,7 @@ from rlcd.plotting import plot_episode_metrics, plot_experiment_scores
 step_penalty = conf["step_penalty"]
 reward_scale = conf["reward_scale"]
 k_experiments = conf["k_experiments"]
+device = conf["device"]
 
 def run_episode(
     X: torch.Tensor,
@@ -29,7 +30,7 @@ def run_episode(
     gamma = conf["gamma"]
     xi = conf["xi"]
     # Initial state: no edges
-    s = torch.zeros((d, d))
+    s = torch.zeros((d, d), device=device)
     s_best = s.clone()
     score = (scorer.score(s)).reshape(1,) # =0
     best_score = score.clone()
@@ -37,8 +38,8 @@ def run_episode(
     for t in range(horizon):
         s_next, a = perform_legal_action(s, q_target)
         next_score = scorer.score(s_next)
-        r = ((next_score - score) - torch.tensor(step_penalty)).reshape(1,)
-        terminal = torch.tensor([(t == horizon - 1)], dtype=bool).reshape(1,)
+        r = ((next_score - score) - torch.tensor(step_penalty, device=device)).reshape(1,)
+        terminal = torch.tensor([(t == horizon - 1)], dtype=bool, device=device).reshape(1,)
 
         memory.push(s, a, r, s_next, terminal)
         s = s_next
@@ -101,7 +102,7 @@ def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor |
     optim = torch.optim.AdamW(q_online.parameters(), conf["Q_lr"], amsgrad=True)
     criterion = torch.nn.SmoothL1Loss()
     # Maintain best seen graph
-    best = {"state": torch.zeros((d, d)), "score": torch.zeros((1,))}
+    best = {"state": torch.zeros((d, d), device=device), "score": torch.zeros((1,), device=device)}
     
     # Run episodes according to schedule
     epsd_best_scores = []
@@ -142,13 +143,13 @@ def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor |
             }
         }
         , exp_num
-        , dag_gt_score=dag_gt_score
+        , dag_gt_score=dag_gt_score.cpu()
     )
 
     return best["state"], epsd_best_scores, epsd_best_shd
 
 def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
-    X = torch.tensor(df.values)
+    X = torch.tensor(df.values, device=device)
     scorer = Scorer(X)
     print(f"\nBaseline score: {scorer.l0 * reward_scale}\n")
 
@@ -156,7 +157,7 @@ def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torc
     scores = []
     shds = []
     for i in range(k_experiments):
-        state, exp_scores, exp_shds = search(i, X, scorer, dag_gt)
+        state, exp_scores, exp_shds = search(i+1, X, scorer, dag_gt)
         states.append(state)
         scores.append(exp_scores)
         shds.append(exp_shds)
@@ -176,4 +177,4 @@ def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torc
         print(s.int())
         print(f"with score {scorer.score(s)}")
     
-    plot_experiment_scores(scores, scorer.score(dag_gt))
+    plot_experiment_scores(scores, scorer.score(dag_gt).cpu())

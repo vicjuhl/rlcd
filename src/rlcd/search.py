@@ -8,7 +8,7 @@ from rlcd.model import QNetwork
 from rlcd.scoring import Scorer
 from rlcd.replay import Transition, ReplayBuffer
 from rlcd.utils import shd
-from rlcd.plotting import plot_episode_metrics, plot_experiment_scores
+from rlcd.plotting import plot_episode_metrics, plot_experiment_scores, plot_adj_matrix
 
 step_penalty = conf["step_penalty"]
 reward_scale = conf["reward_scale"]
@@ -178,3 +178,4 @@ def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torc
         print(f"with score {scorer.score(s)}")
     
     plot_experiment_scores(scores, scorer.score(dag_gt).cpu())
+    plot_adj_matrix(dag_gt.cpu())

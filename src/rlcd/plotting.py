@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import pathlib as pl
 import numpy as np
 from datetime import datetime
+import torch
 
 from rlcd.config import conf
 
@@ -15,7 +16,7 @@ def plot_episode_metrics(
     exp_num: int,
     dag_gt_score: float | None = None
 ):
-    _, ax = plt.subplots()
+    _, ax = plt.subplots(figsize=(9,6))
     axes = [ax]
     colors = plt.cm.tab10.colors
 
@@ -85,7 +86,7 @@ def plot_experiment_scores(
     colors = plt.cm.tab10.colors
 
 
-    _, ax = plt.subplots()
+    _, ax = plt.subplots(figsize=(9,6))
 
     roll_avgs = []
     for i, s in enumerate(scores_np):
@@ -109,4 +110,18 @@ def plot_experiment_scores(
 
     plt.subplots_adjust(right=0.8)
     plt.savefig(time_out_dir / f"global_results.png", bbox_inches="tight")
+    plt.close()
+
+def plot_adj_matrix(adj: torch.Tensor, w: torch.Tensor):
+    """
+    Plots a binary adjacency matrix.
+    
+    Parameters:
+        adj (2D array): square adjacency matrix with 0s and 1s
+    """
+    plt.imshow(adj, cmap='Blues', interpolation='none')
+    plt.colorbar(label='Value')
+    plt.xticks(range(adj.shape[0]))
+    plt.yticks(range(adj.shape[0]))
+    plt.savefig(time_out_dir / f"true_DAG.png", bbox_inches="tight")
     plt.close()

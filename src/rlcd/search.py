@@ -8,10 +8,11 @@ from rlcd.model import QNetwork
 from rlcd.scoring import Scorer
 from rlcd.replay import Transition, ReplayBuffer
 from rlcd.utils import shd
-from rlcd.plotting import plot_episode_metrics
+from rlcd.plotting import plot_episode_metrics, plot_experiment_scores
 
 step_penalty = conf["step_penalty"]
 reward_scale = conf["reward_scale"]
+k_experiments = conf["k_experiments"]
 
 def run_episode(
     X: torch.Tensor,
@@ -30,7 +31,7 @@ def run_episode(
     # Initial state: no edges
     s = torch.zeros((d, d))
     s_best = s.clone()
-    score = scorer.score(s).reshape(1,) # =0
+    score = (scorer.score(s)).reshape(1,) # =0
     best_score = score.clone()
 
     for t in range(horizon):
@@ -73,7 +74,8 @@ def run_episode(
 
             td_target = r_batch + (~term_batch).float() * (gamma * s_next_q_expectation)
 
-            # print(f"δ:\t {td_target.mean().item() - qval_selected.mean().item():.4}, target:\t {td_target.mean().item():.4} pred:\t{qval_selected.mean().item():.4},\t, r: {r_batch.mean():.4}")
+            # for k in range(1):
+            #     print(f"target:\t {td_target[k].item():.4} pred:\t{qval_selected[k].item():.4},\t, r: {r_batch[k]:.4}")
 
             loss = criterion(qval_selected, td_target)
             optim.zero_grad()
@@ -88,11 +90,8 @@ def run_episode(
     assert best_score == scorer.score(s_best), f"{best_score}, {scorer.score(s_best)}"
     return {"state": s_best, "score": best_score}
 
-def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
-    d = len(df.columns)
-    X = torch.tensor(df.values)
-    scorer = Scorer(X)
-    print(f"l0: {scorer.l0}")
+def search(X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor | None=None) -> tuple[torch.Tensor, list, list]:
+    _, d = X.shape
     # Neural network
     q_online = QNetwork(d)
     q_target = deepcopy(q_online)
@@ -145,4 +144,35 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
         , dag_gt_score=dag_gt_score
     )
 
-    return best["state"]
+    return best["state"], epsd_best_scores, epsd_best_shd
+
+def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
+    X = torch.tensor(df.values)
+    scorer = Scorer(X)
+    print(f"\nBaseline score: {scorer.l0 * reward_scale}\n")
+
+    states = []
+    scores = []
+    shds = []
+    for _ in range(k_experiments):
+        state, exp_scores, exp_shds = search(X, scorer, dag_gt)
+        states.append(state)
+        scores.append(exp_scores)
+        shds.append(exp_shds)
+
+    print()    
+    print("=" * 40)
+    print("Global results")
+    print("=" * 40)
+    print("\nTrue DAG:")
+    print(dag_gt.int())
+    print(f"with score {scorer.score(dag_gt)}")
+
+
+    print("\nBest proposal DAGs")
+    for s in states:
+        print()
+        print(s.int())
+        print(f"with score {scorer.score(s)}")
+    
+    plot_experiment_scores(scores, scorer.score(dag_gt))

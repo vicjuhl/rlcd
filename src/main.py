@@ -1,7 +1,7 @@
 import argparse
 from typing import Optional, Sequence, Dict, Any
 
-from rlcd.search import search
+from rlcd.search import run_experiements
 from rlcd.gen_data import gen_dag, gen_data
 
 from rlcd.model import QNetwork
@@ -27,7 +27,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
     dag = gen_dag()
     df = gen_data(dag)
     
-    search(df, dag)
+    run_experiements(df, dag)
 
 if __name__ == "__main__":
     main()

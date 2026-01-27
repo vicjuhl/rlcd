@@ -5,8 +5,10 @@ from datetime import datetime
 
 from rlcd.config import conf
 
-output_dir = pl.Path(__file__).parent.parent.parent / 'results' / 'figures'
+output_dir = pl.Path(__file__).parent.parent.parent / 'results'
 output_dir.mkdir(parents=True, exist_ok=True)
+time_out_dir = output_dir / str(datetime.now())
+time_out_dir.mkdir(parents=True, exist_ok=True)
 
 def plot_episode_metrics(
     results_dict: dict[str, dict],
@@ -64,9 +66,46 @@ def plot_episode_metrics(
 
     ax.set_xlabel('Episode')
     plt.subplots_adjust(right=0.9)
-    time_out_dir = output_dir / str(datetime.now())
-    time_out_dir.mkdir(parents=True, exist_ok=True)
     plt.savefig(
         time_out_dir / f'episode_results_{"_".join([k + "=" + str(v) for k, v in conf.items()])}_window={window}.png',
         bbox_inches="tight"
     )
+    plt.close()
+
+def plot_experiment_scores(
+    scores: list[list[float]],  # list of score series
+    dag_gt_score: float | None = None
+):
+    if conf is None or "num_episodes" not in conf:
+        raise ValueError("conf must be provided with key 'num_episodes'")
+
+    window = conf["num_episodes"] // 20
+    scores_np = [np.array(s) for s in scores]
+    n_series = len(scores)
+    colors = plt.cm.tab10.colors
+
+    _, ax = plt.subplots()
+
+    for i, s in enumerate(scores_np):
+        lbl = f"Series {i+1}"
+        roll_avg = np.array([s[max(0, j-window):j+1].mean() for j in range(len(s))])
+        roll_median = np.array([np.median(s[max(0, j-window):j+1]) for j in range(len(s))])
+
+        ax.plot(roll_avg, label=f"{lbl} rolling avg", color=colors[i % len(colors)])
+
+    # median across series at each episode
+    all_scores_array = np.array(scores_np)  # shape (n_series, n_episodes)
+    median_across_series = np.median(all_scores_array, axis=0)
+    ax.plot(median_across_series, label="Median across series", color='black', linestyle='--')
+
+    if dag_gt_score is not None:
+        ax.axhline(y=dag_gt_score, color='r', linestyle='--', label='DAG GT Score')
+
+    ax.set_xlabel("Episode")
+    ax.set_ylabel("Best episode score")
+    ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
+    ax.legend(loc='center left', bbox_to_anchor=(1.05, 0.5))
+
+    plt.subplots_adjust(right=0.8)
+    plt.savefig(time_out_dir / f"global_results.png", bbox_inches="tight")
+    plt.close()

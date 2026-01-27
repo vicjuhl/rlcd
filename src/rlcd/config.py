@@ -6,7 +6,7 @@ reward_scale = 1e-3
 
 conf = {
     "T": 10,
-    "num_episodes": 300,
+    "num_episodes": 250,
     "d": d,
     "n": n,
     "indegree": 3,
@@ -15,7 +15,7 @@ conf = {
     "tau_prime": 5,
     "Q_lr": 1e-0,
     "gamma": 0.98,
-    "xi": 0.95,
+    "xi": 0.99,
     "batch_size": 32,
     "reward_scale": reward_scale,
     "step_penalty": .002 * d * n * reward_scale

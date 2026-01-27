@@ -11,6 +11,7 @@ from rlcd.utils import shd
 from rlcd.plotting import plot_episode_metrics
 
 step_penalty = conf["step_penalty"]
+reward_scale = conf["reward_scale"]
 
 def run_episode(
     X: torch.Tensor,
@@ -97,7 +98,7 @@ def search(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     q_target = deepcopy(q_online)
     q_online.train()
     # Replay and optimimization
-    memory = ReplayBuffer(100000)
+    memory = ReplayBuffer(10000)
     optim = torch.optim.AdamW(q_online.parameters(), conf["Q_lr"], amsgrad=True)
     criterion = torch.nn.SmoothL1Loss()
     # Maintain best seen graph

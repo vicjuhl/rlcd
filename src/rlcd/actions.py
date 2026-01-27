@@ -115,8 +115,8 @@ def alter_edge(
             else:
                 s_new[i, j] = 1 # add edge i, j
         case 2: # reverse
-            s_new[i, j] = 1 # add edge i, j
-            s_new[j, i] = 0 # remove edge j, i
+            s_new[i, j] = 0 # remove edge i, j
+            s_new[j, i] = 1 # add edge j, i
         case _:
             raise ValueError(f"Unexpected action: {a}")
     

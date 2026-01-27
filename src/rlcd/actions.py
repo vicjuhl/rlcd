@@ -133,16 +133,13 @@ def sample_action(q_shape: torch.Size, pi_flat: torch.Tensor) -> torch.Tensor:
 def expectation_of_q(q_table: torch.Tensor, legal_mask: torch.Tensor) -> torch.Tensor:
     """Finds expectation of Q tables, one for each batch element."""
     bs = q_table.shape[0]
-    tau = tau_from_q(q_table)
 
     # Flatten per batch
-    q_flat = q_table.clone().view(bs, -1) # (bs, d*d)
-    mask_flat = legal_mask.view(bs, -1) # (bs, d*d)
+    q_flat = q_table.view(bs, -1) # (bs, d*d)
+    mask_flat = legal_mask.view(bs, -1).bool() # (bs, d*d)
+    q_masked = q_flat.masked_fill(~mask_flat, float("-inf"))
 
-    # 'Remove' masked values
-    q_flat[~mask_flat] = float(-1e6) # (bs, d*d)
-
-    pi = torch.softmax(q_flat / tau, dim=1)
+    pi = torch.softmax(q_masked, dim=1)
     return (pi * q_flat).sum(dim=1) # (bs,)
 
 def tau_from_q(q_table: torch.Tensor) -> float:

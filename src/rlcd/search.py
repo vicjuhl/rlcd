@@ -1,6 +1,7 @@
 import pandas as pd
 import torch
 from copy import deepcopy
+import numpy as np
 
 from rlcd.config import conf
 from rlcd.actions import perform_legal_action, filter_illegal_actions, expectation_of_q
@@ -8,7 +9,7 @@ from rlcd.model import QNetwork
 from rlcd.scoring import Scorer
 from rlcd.replay import Transition, ReplayBuffer
 from rlcd.utils import shd
-from rlcd.plotting import plot_episode_metrics, plot_experiment_scores, plot_adj_matrix
+from rlcd.plotting import plot_episode_metrics, plot_experiment_scores, plot_adj_matrix, dump_info
 
 step_penalty = conf["step_penalty"]
 reward_scale = conf["reward_scale"]
@@ -102,7 +103,8 @@ def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor |
     criterion = torch.nn.SmoothL1Loss()
     # Maintain best seen graph
     best = {"state": torch.zeros((d, d), device=device), "score": torch.zeros((1,), device=device)}
-    
+    best_found_at = 1
+
     # Run episodes according to schedule
     epsd_best_scores = []
     epsd_best_shd = []
@@ -115,6 +117,7 @@ def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor |
             print(f"SHD: {shd_epsd}")
         if epsd_best["score"] > best["score"]:
             best = epsd_best.copy()
+            best_found_at = epsd_num + 1
         
         epsd_best_shd.append(shd_epsd)
         epsd_best_scores.append(epsd_best["score"].item())
@@ -145,7 +148,7 @@ def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor |
         , dag_gt_score=dag_gt_score.cpu()
     )
 
-    return best["state"], epsd_best_scores, epsd_best_shd
+    return best["state"], epsd_best_scores, epsd_best_shd, best_found_at
 
 def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torch.Tensor:
     X = torch.tensor(df.values, device=device)
@@ -155,11 +158,13 @@ def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torc
     states = []
     scores = []
     shds = []
+    best_found_ats = []
     for i in range(k_experiments):
-        state, exp_scores, exp_shds = search(i+1, X, scorer, dag_gt)
+        state, exp_scores, exp_shds, best_found_at = search(i+1, X, scorer, dag_gt)
         states.append(state)
         scores.append(exp_scores)
         shds.append(exp_shds)
+        best_found_ats.append(best_found_at)
 
     print()    
     print("=" * 40)
@@ -178,3 +183,9 @@ def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torc
         plot_adj_matrix(s.cpu(), i+1)
     
     plot_experiment_scores(scores, scorer.score(dag_gt).cpu())
+    dump_info({
+        "scores": scores,
+        "shds": shds,
+        "best_found_ats": best_found_ats,
+        "dag_gt": dag_gt.cpu().numpy() if dag_gt is not None else np.array([])
+    })

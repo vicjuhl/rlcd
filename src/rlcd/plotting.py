@@ -3,6 +3,7 @@ import pathlib as pl
 import numpy as np
 from datetime import datetime
 import torch
+import json
 
 from rlcd.config import conf
 
@@ -127,3 +128,15 @@ def plot_adj_matrix(adj: torch.Tensor, mat_num: int):
     file_name = "true_DAG" if mat_num == -1 else f"matrix_{mat_num}"
     plt.savefig(time_out_dir / f"{file_name}.png", bbox_inches="tight")
     plt.close()
+
+def dump_info(results: dict) -> None:
+    # Configuration
+    with open(time_out_dir / "conf.json", "w") as f:
+        json.dump(conf, f, indent=2)
+
+    # Convert numpy arrays to lists
+    for k, v in results.items():
+        if not isinstance(v, list):
+            results[k] = v.tolist()
+    with open(time_out_dir / "results.json", "w") as f:
+        json.dump(results, f, indent=2)

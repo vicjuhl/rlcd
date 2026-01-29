@@ -24,7 +24,8 @@ def run_episode(
     scorer: Scorer,
     memory: ReplayBuffer,
     optim: torch.optim.AdamW,
-    criterion: torch.nn.Module
+    criterion: torch.nn.Module,
+    uniform: bool
 ) -> dict[str, torch.Tensor | int]:
     _, d = X.shape
     bs = conf["batch_size"]
@@ -37,7 +38,7 @@ def run_episode(
     best_score = score.clone()
 
     for t in range(horizon):
-        s_next, a = perform_legal_action(s, q_target)
+        s_next, a = perform_legal_action(s, q_target, uniform)
         next_score = scorer.score(s_next)
         r = ((next_score - score) - torch.tensor(step_penalty, device=device)).reshape(1,)
         terminal = torch.tensor([(t == horizon - 1)], dtype=bool, device=device).reshape(1,)
@@ -51,7 +52,7 @@ def run_episode(
             best_score = score.clone()
         
         # Learn
-        if len(memory) >= bs:
+        if len(memory) >= bs and not uniform:
             batch = memory.sample(bs)
             s_batch = torch.stack(batch.s)
             a_batch = torch.stack(batch.a)
@@ -91,7 +92,14 @@ def run_episode(
 
     return {"state": s_best, "score": best_score}
 
-def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor | None=None) -> tuple[torch.Tensor, list, list]:
+def search(
+    exp_num: int,
+    X: torch.Tensor,
+    scorer: Scorer,
+    uniform: bool,
+    dag_gt: torch.Tensor | None=None
+) -> tuple[torch.Tensor, list, list]:
+    
     _, d = X.shape
     # Neural network
     q_online = QNetwork(d)
@@ -110,7 +118,7 @@ def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor |
     epsd_best_shd = []
     for epsd_num, T in enumerate([conf["T"]] * conf["num_episodes"]):
         print(f"\nRunning episode {epsd_num} with T={T}")
-        epsd_best = run_episode(X, T, q_online, q_target, scorer, memory, optim, criterion)
+        epsd_best = run_episode(X, T, q_online, q_target, scorer, memory, optim, criterion, uniform)
         print(f"Episode best score {epsd_best["score"].item()} with degree {int(epsd_best["score"].sum().item())}")
         if dag_gt is not None:
             shd_epsd = shd(epsd_best["state"], dag_gt)
@@ -145,6 +153,7 @@ def search(exp_num: int, X: torch.Tensor, scorer: Scorer, dag_gt: torch.Tensor |
             }
         }
         , exp_num
+        , uniform
         , dag_gt_score=dag_gt_score.cpu()
     )
 
@@ -155,37 +164,41 @@ def run_experiements(df: pd.DataFrame, dag_gt: torch.Tensor | None=None) -> torc
     scorer = Scorer(X)
     print(f"\nBaseline score: {scorer.l0 * reward_scale}\n")
 
-    states = []
-    scores = []
-    shds = []
-    best_found_ats = []
-    for i in range(k_experiments):
-        state, exp_scores, exp_shds, best_found_at = search(i+1, X, scorer, dag_gt)
-        states.append(state)
-        scores.append(exp_scores)
-        shds.append(exp_shds)
-        best_found_ats.append(best_found_at)
+    for uniform in [False, True]:
+        states = []
+        scores = []
+        shds = []
+        best_found_ats = []
+        for i in range(k_experiments):
+            state, exp_scores, exp_shds, best_found_at = search(i+1, X, scorer, uniform, dag_gt)
+            states.append(state)
+            scores.append(exp_scores)
+            shds.append(exp_shds)
+            best_found_ats.append(best_found_at)
 
-    print()    
-    print("=" * 40)
-    print("Global results")
-    print("=" * 40)
-    print("\nTrue DAG:")
-    print(dag_gt.int())
-    print(f"with score {scorer.score(dag_gt)}")
-    plot_adj_matrix(dag_gt.cpu(), -1)
+        print()    
+        print("=" * 40)
+        print(f"Global results with uniform {uniform}")
+        print("=" * 40)
+        print("\nTrue DAG:")
+        print(dag_gt.int())
+        print(f"with score {scorer.score(dag_gt)}")
+        plot_adj_matrix(dag_gt.cpu(), -1, uniform)
 
-    print("\nBest proposal DAGs")
-    for i, s in enumerate(states):
-        print()
-        print(s.int())
-        print(f"with score {scorer.score(s)}")
-        plot_adj_matrix(s.cpu(), i+1)
-    
-    plot_experiment_scores(scores, scorer.score(dag_gt).cpu())
-    dump_info({
-        "scores": scores,
-        "shds": shds,
-        "best_found_ats": best_found_ats,
-        "dag_gt": dag_gt.cpu().numpy() if dag_gt is not None else np.array([])
-    })
+        print("\nBest proposal DAGs")
+        for i, s in enumerate(states):
+            print()
+            print(s.int())
+            print(f"with score {scorer.score(s)}")
+            plot_adj_matrix(s.cpu(), i+1, uniform)
+        
+        plot_experiment_scores(scores, "score", uniform, scorer.score(dag_gt).cpu())
+        plot_experiment_scores(shds, "shd", uniform, scorer.score(dag_gt).cpu())
+        dump_info({
+            "scores": scores,
+            "shds": shds,
+            "best_found_ats": best_found_ats,
+            "dag_gt": dag_gt.cpu().numpy() if dag_gt is not None else np.array([])
+            }
+            , uniform
+        )

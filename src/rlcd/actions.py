@@ -151,7 +151,8 @@ def tau_from_q(q_table: torch.Tensor) -> float:
 
 def perform_legal_action(
     s: torch.Tensor,
-    q_network: QNetwork
+    q_network: QNetwork,
+    uniform: bool
 ) -> Tuple[torch.Tensor, torch.Tensor]:
     """Sample action based on state.
     
@@ -162,8 +163,12 @@ def perform_legal_action(
     """
     d = s.shape[0]
     s_bool = s.bool()
-    q_table = q_network.forward(s) # (d, d, 3)
-    tau = tau_from_q(q_table)
+    if not uniform:
+        q_table = q_network.forward(s) # (d, d, 3)
+        tau = tau_from_q(q_table)
+    else:
+        q_table = torch.ones((d, d, 3), device=device)
+        tau = 1
 
     # Filter removals and reversals (all existing edges)
     # Some reversals may create cycles, checked below

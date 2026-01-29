@@ -37,11 +37,11 @@ def gen_funcs(dag, noise_scale):
 
     # Sample bias
     c = torch.empty((d,)).uniform_(-1, 1)
-    c[:] = 0
+    c[:] = 0 # WARNING: setting c to non-zero requires rewriting the likelihood algorithm in scoring.py with padding of X and W.
 
     # Sample scale b
     dist = torch.distributions.Gamma(2, 2)
-    b = dist.sample((d,)).to(device) / 10 * noise_scale
+    b = dist.sample((d,)).to(device) * noise_scale
 
     return w, c, b
 

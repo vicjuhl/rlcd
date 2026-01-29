@@ -1,9 +1,9 @@
 import torch
 
 n = 1000
-d = 5
+d = 6
 reward_scale = 1e-3
-T = d * 2
+T = 25
 
 # Device configuration
 if torch.cuda.is_available():
@@ -18,13 +18,13 @@ conf = {
     "device": device,
     "k_experiments": 5,
     "T": T,
-    "num_episodes": 150,
+    "num_episodes": 80,
     "d": d,
     "n": n,
-    "indegree": 5,
-    "noise_scale": 1,
-    "beta": .02 * d * n * reward_scale,
-    "tau_prime": 4,
+    "indegree": int(d**1.15),
+    "noise_scale": .1,
+    "beta": .0225 * d * n * reward_scale, # scales poorly with n: becomes overly edge-cauious for large n
+    "tau_prime": 5,
     "Q_lr": 1e-2,
     "gamma": 0.98,
     "xi": 0.98,

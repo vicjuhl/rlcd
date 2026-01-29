@@ -12,8 +12,8 @@ class QNetwork(torch.nn.Module):
         super().__init__()
         self.d = d
         self.fc1 = nn.Linear(d*d, 128, device=device)
-        self.fc2 = nn.Linear(128, 128, device=device)
-        self.fc3 = nn.Linear(128 + 1, d*d*3, device=device)
+        self.fc2 = nn.Linear(128, 127, device=device)
+        self.fc3 = nn.Linear(127 + 1, d*d*3, device=device)
 
     def forward(self, s: torch.Tensor, term: torch.Tensor | None=None) -> torch.Tensor:
         """Returns batchsize Q-tables of dimension (bs, d, d, 3).
@@ -40,7 +40,7 @@ class QNetwork(torch.nn.Module):
             return x.view(self.d, self.d, 3)
         
 
-class QGNN(nn.Module):
+class QGNN(nn.Module): # Incomplete implementation TODO
     def __init__(self, node_in_dim, node_hidden_dim, msg_hidden_dim, attn_dim):
         """
         node_in_dim   : input feature size of nodes

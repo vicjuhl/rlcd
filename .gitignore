@@ -4,3 +4,4 @@ settings.json
 build/
 src/r.egg-info/
 results/
+*.DS_Store
